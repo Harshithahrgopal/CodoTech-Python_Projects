@@ -1,0 +1,99 @@
+import tkinter as tk
+from tkinter import messagebox
+
+class TodoListApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("To-Do List Application")
+        self.root.geometry("550x410")
+        self.root.configure(bg="#e0f7fa")
+
+        self.tasks = []
+
+        self.title_label = tk.Label(self.root, text="To-Do List", font=("Arial", 18, "bold"), bg="#e0f7fa", fg="#000000")
+        self.title_label.pack(pady=10, fill=tk.X)
+
+        self.user_instruction = tk.Label(self.root, text="Welcome! Add, View, Edit, or Delete your tasks below.", font=("Arial", 10), bg="#e0f7fa", fg="#00796b")
+        self.user_instruction.pack(pady=5)
+
+        self.task_listbox = tk.Listbox(self.root, width=40, height=6, font=("Arial", 12), bg="#ffffff", selectmode=tk.SINGLE, highlightthickness=2, highlightbackground="#e0f7fa")
+        self.task_listbox.pack(pady=20)
+
+        self.input_frame = tk.Frame(self.root, bg="#e0f7fa")
+        self.input_frame.pack()
+
+        self.task_entry = tk.Entry(self.input_frame, width=35, font=("Arial", 14), bg="#ffffff", bd=2)
+        self.task_entry.grid(row=0, column=0, padx=5)
+
+        self.buttons_frame = tk.Frame(self.root, bg="#e0f7fa")
+        self.buttons_frame.pack(pady=10)
+
+        self.add_button = tk.Button(self.buttons_frame, text="Add Task", font=("Arial", 10, "bold"), bg="#00796b", fg="#ffffff", command=self.add_task, padx=10, pady=5)
+        self.add_button.grid(row=0, column=0, padx=5)
+
+        self.view_button = tk.Button(self.buttons_frame, text="View Tasks", font=("Arial", 10, "bold"), bg="#00796b", fg="#ffffff", command=self.view_tasks, padx=10, pady=5)
+        self.view_button.grid(row=0, column=1, padx=5)
+
+        self.edit_button = tk.Button(self.buttons_frame, text="Edit Task", font=("Arial", 10, "bold"), bg="#00796b", fg="#ffffff", command=self.edit_task, padx=10, pady=5)
+        self.edit_button.grid(row=0, column=2, padx=5)
+
+        self.delete_button = tk.Button(self.buttons_frame, text="Delete Task", font=("Arial", 10, "bold"), bg="#00796b", fg="#ffffff", command=self.delete_task, padx=10, pady=5)
+        self.delete_button.grid(row=0, column=3, padx=5)
+
+        self.exit_button = tk.Button(self.root, text="Exit", font=("Arial", 10, "bold"), bg="#f44336", fg="#ffffff", command=self.exit_app, padx=10, pady=5)
+        self.exit_button.pack(pady=10)
+
+    def add_task(self):
+        task = self.task_entry.get()
+        if task:
+            self.tasks.append(task)
+            self.update_task_listbox()
+            self.task_entry.delete(0, tk.END)
+        else:
+            messagebox.showwarning("Input Error", "Please enter a task.")
+
+    def view_tasks(self):
+        if not self.tasks:
+            messagebox.showinfo("No Tasks", "No tasks available.")
+        else:
+            task_list = "\n".join([f"{index + 1}. {task}" for index, task in enumerate(self.tasks)])
+            messagebox.showinfo("Your To-Do List", task_list)
+
+    def edit_task(self):
+        selected_task_index = self.task_listbox.curselection()
+        if selected_task_index:
+            selected_task_index = selected_task_index[0]
+            new_task = self.task_entry.get()
+            if new_task:
+                self.tasks[selected_task_index] = new_task
+                self.update_task_listbox()
+                self.task_entry.delete(0, tk.END)
+            else:
+                messagebox.showwarning("Input Error", "Please enter a new task.")
+        else:
+            messagebox.showwarning("Selection Error", "Please select a task to edit.")
+
+    def delete_task(self):
+        selected_task_index = self.task_listbox.curselection()
+        if selected_task_index:
+            selected_task_index = selected_task_index[0]
+            del self.tasks[selected_task_index]
+            self.update_task_listbox()
+        else:
+            messagebox.showwarning("Selection Error", "Please select a task to delete.")
+
+    def update_task_listbox(self):
+        self.task_listbox.delete(0, tk.END)
+        for task in self.tasks:
+            self.task_listbox.insert(tk.END, task)
+
+    def exit_app(self):
+        self.root.quit()
+
+def main():
+    root = tk.Tk()
+    app = TodoListApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
