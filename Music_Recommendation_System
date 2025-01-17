@@ -1,0 +1,160 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import time
+import streamlit.components.v1 as components
+
+CLIENT_ID = "638134ebdead4b6ab66080e6f1389e3e"
+CLIENT_SECRET = "c37da0536c744ddb8f5255df71b804b0"
+
+client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
+sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
+def fetch_music_data(genre="pop", limit=20):
+    results = sp.search(q=f"genre:{genre}", type="track", limit=limit)
+    songs = []
+    artists = []
+    for track in results["tracks"]["items"]:
+        songs.append(track["name"])
+        artists.append(track["artists"][0]["name"])
+    return pd.DataFrame({"song": songs, "artist": artists})
+
+def fetch_audio_features(music_df):
+    features = []
+    for song, artist in zip(music_df['song'], music_df['artist']):
+        search_query = f"track:{song} artist:{artist}"
+        results = sp.search(q=search_query, type="track", limit=1)
+        if results["tracks"]["items"]:
+            track_id = results["tracks"]["items"][0]["id"]
+            try:
+                audio_features = sp.audio_features(track_id)
+                if audio_features and audio_features[0]:
+                    features.append([ 
+                        audio_features[0]["danceability"], 
+                        audio_features[0]["energy"], 
+                        audio_features[0]["valence"], 
+                        audio_features[0]["tempo"]
+                    ])
+                else:
+                    features.append([0, 0, 0, 0])
+            except spotipy.exceptions.SpotifyException:
+                features.append([0, 0, 0, 0])
+        else:
+            features.append([0, 0, 0, 0])
+        time.sleep(0.1)
+    return np.array(features)
+
+def calculate_similarity(features):
+    return cosine_similarity(features)
+
+def get_album_cover_url(song_name, artist_name):
+    search_query = f"track:{song_name} artist:{artist_name}"
+    results = sp.search(q=search_query, type="track", limit=1)
+    if results["tracks"]["items"]:
+        return results["tracks"]["items"][0]["album"]["images"][0]["url"]
+    return "https://i.postimg.cc/0QNxYz4V/social.png"
+
+def recommend_songs(selected_song, music_df, similarity_matrix, top_n=15):
+    index = music_df[music_df['song'] == selected_song].index[0]
+    distances = sorted(list(enumerate(similarity_matrix[index])), reverse=True, key=lambda x: x[1])
+    recommended_songs = []
+    recommended_posters = []
+    for i in distances[1:top_n+1]:
+        song = music_df.iloc[i[0]]['song']
+        artist = music_df.iloc[i[0]]['artist']
+        recommended_songs.append(song)
+        recommended_posters.append(get_album_cover_url(song, artist))
+    return recommended_songs, recommended_posters
+
+# Custom CSS to center content and change background color
+st.markdown("""
+    <style>
+    body {
+        background-color:rgb(2, 13, 31);  /* Dark background for the entire page */
+        color: white;  /* Text color set to white */
+        font-family: 'Arial', sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+    .main {
+        background: linear-gradient(135deg, #4a7cfc, #6ec4ff);  /* Lighter gradient background for content */
+        padding: 2rem;
+        border-radius: 10px;
+        width: 80%;
+        margin: 0 auto;  /* Centering the content */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .stButton > button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        padding: 10px;
+    }
+    .stButton > button:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+    .stInfo, .stSuccess, .stWarning {
+        border-radius: 8px;
+        font-weight: bold;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("🎵 Real-Time Music Recommender System")
+st.markdown("Select a genre, choose your favorite song, and discover your next favorite track!")
+
+genre = st.selectbox("Select a genre", ["pop", "rock", "hip-hop", "jazz", "classical"])
+st.info("Fetching songs for the selected genre...")
+
+music_df = fetch_music_data(genre=genre)
+features = fetch_audio_features(music_df)
+similarity_matrix = calculate_similarity(features)
+
+selected_song = st.selectbox("Select a song for recommendations", music_df['song'].values)
+
+if st.button("Show Recommendations"):
+    st.success(f"Recommendations for: **{selected_song}**")
+    recommended_songs, recommended_posters = recommend_songs(selected_song, music_df, similarity_matrix, top_n=15)  # Show 15 recommendations
+    
+    # Display 15 songs in 3 rows, with 5 songs per row
+    cols = st.columns(5)  # Create 5 columns
+    
+    # Split the list of songs into batches of 5 (3 rows)
+    for i in range(0, len(recommended_songs), 5):  # Iterate over batches of 5 songs
+        row_songs = recommended_songs[i:i+5]
+        row_posters = recommended_posters[i:i+5]
+        
+        # Create each row with 5 columns
+        for col, song, poster in zip(cols, row_songs, row_posters):
+            with col:
+                st.text(song)
+                st.image(poster)
+        st.text("")
+    
+
+components.html("""
+    <script>
+    function showPopup(message) {
+        alert(message);
+    }
+    </script>
+""", height=0)
+
+if st.button("Need Help?"):
+    components.html("""
+        <script>
+        showPopup('This is a real-time music recommendation app. Select a genre, pick a song, and explore recommendations!');
+        </script>
+    """, height=0)
+
+st.markdown("""
+    <div style="text-align:center; margin-top:50px; color:#ccc;">
+        <small>Built with ❤️ by [Harshitha]</small>
+    </div>
+""", unsafe_allow_html=True)
